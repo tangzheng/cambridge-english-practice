@@ -48,43 +48,47 @@ export function Quiz() {
   const [trueFalseAnswer, setTrueFalseAnswer] = useState<boolean | null>(null);
 
   const isInitialMount = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
 
-  // Helper to speak - uses browser TTS with best available voice
-  const speak = (text: string) => {
-    if (!window.speechSynthesis) return;
+  // Get Baidu access token
+  const getAccessToken = async (): Promise<string> => {
+    if (accessTokenRef.current) return accessTokenRef.current;
 
-    speechSynthesis.cancel();
+    const apiKey = 'd6k9JVth0Xt4PxWbnV2pCIdW';
+    const secretKey = 'IEpyTkWBwWbJSmSr2O9ruI52HNktiOHe';
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.6; // Much slower for kids
-    utterance.pitch = 1.0;
+    try {
+      const response = await fetch(
+        `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`
+      );
+      const data = await response.json();
+      accessTokenRef.current = data.access_token;
+      return data.access_token;
+    } catch {
+      return '';
+    }
+  };
 
-    // Load and select best voice
-    const setVoice = () => {
-      const voices = speechSynthesis.getVoices();
-      // Priority: native OS voices (Samantha, Karen, Daniel, Ting-Ting) > Google > Microsoft
-      const preferredVoice = voices.find(v =>
-        v.name.includes('Samantha') ||
-        v.name.includes('Karen') ||
-        v.name.includes('Daniel') ||
-        v.name.includes('Ting-Ting') ||
-        v.name.includes('Google') ||
-        v.name.includes('Microsoft')
-      ) || voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en')) || voices[0];
-
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-        utterance.rate = 0.6; // Ensure slow speed
+  // Helper to speak using Baidu TTS
+  const speak = async (text: string) => {
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        console.error('Failed to get Baidu access token');
+        return;
       }
-      speechSynthesis.speak(utterance);
-    };
 
-    const voices = speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      setVoice();
-    } else {
-      speechSynthesis.onvoiceschanged = setVoice;
+      const ttsUrl = `https://tsn.baidu.com/text2audio?lan=en&tok=${token}&ctp=1&cuid=123456&tex=${encodeURIComponent(text)}&vol=9&rate=4&per=0`;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
+      audioRef.current = new Audio(ttsUrl);
+      await audioRef.current.play();
+    } catch (err) {
+      console.error('TTS error:', err);
     }
   };
 
