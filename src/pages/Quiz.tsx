@@ -49,6 +49,26 @@ export function Quiz() {
 
   const isInitialMount = useRef(true);
 
+  // Helper to speak with better voice
+  const speak = (text: string) => {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.8; // Slower for kids
+    utterance.pitch = 1.1; // Slightly higher pitch
+
+    // Try to find a good English voice
+    const voices = speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('English'))
+      || voices.find(v => v.lang.startsWith('en-US'))
+      || voices.find(v => v.lang.startsWith('en'));
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
+
+    speechSynthesis.speak(utterance);
+  };
+
   // Initialize quiz with ALL words when mode is selected
   useEffect(() => {
     if (quizMode && allWords.length > 0 && isInitialMount.current) {
@@ -322,11 +342,7 @@ export function Quiz() {
               <>
                 <div className="text-5xl mb-4">🔊</div>
                 <button
-                  onClick={() => {
-                    const utterance = new SpeechSynthesisUtterance(currentWord.word);
-                    utterance.lang = 'en-US';
-                    speechSynthesis.speak(utterance);
-                  }}
+                  onClick={() => speak(currentWord.word)}
                   className="px-6 py-2 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
                 >
                   点击听发音
@@ -367,11 +383,7 @@ export function Quiz() {
                 <div className="text-5xl mb-4">✏️</div>
                 <div className="text-gray-600 mb-4">听发音，写出单词:</div>
                 <button
-                  onClick={() => {
-                    const utterance = new SpeechSynthesisUtterance(currentWord.word);
-                    utterance.lang = 'en-US';
-                    speechSynthesis.speak(utterance);
-                  }}
+                  onClick={() => speak(currentWord.word)}
                   className="px-6 py-2 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors mb-4"
                 >
                   🔊 听发音
