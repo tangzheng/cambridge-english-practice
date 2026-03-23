@@ -48,25 +48,41 @@ export function Quiz() {
   const [trueFalseAnswer, setTrueFalseAnswer] = useState<boolean | null>(null);
 
   const isInitialMount = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Helper to speak with better voice
+  // Helper to speak - uses ResponsiveVoice free API with fallback
   const speak = (text: string) => {
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.8; // Slower for kids
-    utterance.pitch = 1.1; // Slightly higher pitch
+    // Try ResponsiveVoice API first (better quality, works in China)
+    const rvUrl = `https://code.responsivevoice.org/getvoice.php?t=${encodeURIComponent(text)}&sv=g1&vn=&pitch=0.5&rate=0.5&vol=1&lang=en-US`;
 
-    // Try to find a good English voice
-    const voices = speechSynthesis.getVoices();
-    const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('English'))
-      || voices.find(v => v.lang.startsWith('en-US'))
-      || voices.find(v => v.lang.startsWith('en'));
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
 
-    speechSynthesis.speak(utterance);
+    const audio = new Audio(rvUrl);
+    audioRef.current = audio;
+
+    audio.onerror = () => {
+      // Fallback to browser TTS
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.7;
+      const voices = speechSynthesis.getVoices();
+      const enVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      if (enVoice) utterance.voice = enVoice;
+      speechSynthesis.speak(utterance);
+    };
+
+    audio.play().catch(() => {
+      // Fallback to browser TTS
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.7;
+      speechSynthesis.speak(utterance);
+    });
   };
 
   // Initialize quiz with ALL words when mode is selected
