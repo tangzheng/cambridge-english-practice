@@ -7,7 +7,7 @@ import { History } from './pages/History';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/cambridge-english-practice">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/study/:level/:category?" element={<Study />} />
