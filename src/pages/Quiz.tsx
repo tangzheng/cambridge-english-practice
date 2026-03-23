@@ -48,41 +48,44 @@ export function Quiz() {
   const [trueFalseAnswer, setTrueFalseAnswer] = useState<boolean | null>(null);
 
   const isInitialMount = useRef(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Helper to speak - uses ResponsiveVoice free API with fallback
+  // Helper to speak - uses browser TTS with best available voice
   const speak = (text: string) => {
-    // Try ResponsiveVoice API first (better quality, works in China)
-    const rvUrl = `https://code.responsivevoice.org/getvoice.php?t=${encodeURIComponent(text)}&sv=g1&vn=&pitch=0.5&rate=0.5&vol=1&lang=en-US`;
+    if (!window.speechSynthesis) return;
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    speechSynthesis.cancel();
 
-    const audio = new Audio(rvUrl);
-    audioRef.current = audio;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.6; // Much slower for kids
+    utterance.pitch = 1.0;
 
-    audio.onerror = () => {
-      // Fallback to browser TTS
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.7;
+    // Load and select best voice
+    const setVoice = () => {
       const voices = speechSynthesis.getVoices();
-      const enVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-      if (enVoice) utterance.voice = enVoice;
+      // Priority: native OS voices (Samantha, Karen, Daniel, Ting-Ting) > Google > Microsoft
+      const preferredVoice = voices.find(v =>
+        v.name.includes('Samantha') ||
+        v.name.includes('Karen') ||
+        v.name.includes('Daniel') ||
+        v.name.includes('Ting-Ting') ||
+        v.name.includes('Google') ||
+        v.name.includes('Microsoft')
+      ) || voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.rate = 0.6; // Ensure slow speed
+      }
       speechSynthesis.speak(utterance);
     };
 
-    audio.play().catch(() => {
-      // Fallback to browser TTS
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.7;
-      speechSynthesis.speak(utterance);
-    });
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      setVoice();
+    } else {
+      speechSynthesis.onvoiceschanged = setVoice;
+    }
   };
 
   // Initialize quiz with ALL words when mode is selected
