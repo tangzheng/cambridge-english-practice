@@ -48,7 +48,6 @@ export function Quiz() {
   const [trueFalseAnswer, setTrueFalseAnswer] = useState<boolean | null>(null);
 
   const isInitialMount = useRef(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const accessTokenRef = useRef<string | null>(null);
 
   // Get Baidu access token
@@ -81,12 +80,15 @@ export function Quiz() {
 
       const ttsUrl = `https://tsn.baidu.com/text2audio?lan=en&tok=${token}&ctp=1&cuid=123456&tex=${encodeURIComponent(text)}&vol=9&rate=4&per=0`;
 
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      // Use fetch + blob to handle CORS
+      const response = await fetch(ttsUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play();
 
-      audioRef.current = new Audio(ttsUrl);
-      await audioRef.current.play();
+      // Clean up blob URL after playing
+      audio.onended = () => URL.revokeObjectURL(url);
     } catch (err) {
       console.error('TTS error:', err);
     }
