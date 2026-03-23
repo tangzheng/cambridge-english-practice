@@ -48,49 +48,57 @@ export function Quiz() {
   const [trueFalseAnswer, setTrueFalseAnswer] = useState<boolean | null>(null);
 
   const isInitialMount = useRef(true);
-  const accessTokenRef = useRef<string | null>(null);
+  const voicesLoaded = useRef(false);
 
-  // Get Baidu access token
-  const getAccessToken = async (): Promise<string> => {
-    if (accessTokenRef.current) return accessTokenRef.current;
+  // Helper to speak using browser TTS with best English voice
+  const speak = (text: string) => {
+    if (!window.speechSynthesis) return;
 
-    const apiKey = 'd6k9JVth0Xt4PxWbnV2pCIdW';
-    const secretKey = 'IEpyTkWBwWbJSmSr2O9ruI52HNktiOHe';
+    speechSynthesis.cancel();
 
-    try {
-      const response = await fetch(
-        `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`
-      );
-      const data = await response.json();
-      accessTokenRef.current = data.access_token;
-      return data.access_token;
-    } catch {
-      return '';
-    }
-  };
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.7;
+    utterance.pitch = 1.0;
 
-  // Helper to speak using Baidu TTS
-  const speak = async (text: string) => {
-    try {
-      const token = await getAccessToken();
-      if (!token) {
-        console.error('Failed to get Baidu access token');
-        return;
+    const loadAndSpeak = () => {
+      const voices = speechSynthesis.getVoices();
+      if (voices.length === 0) return;
+
+      // Find best English voice - prefer voices with names that sound natural
+      const voice = voices.find(v =>
+        v.lang === 'en-US' && (
+          v.name.includes('Samantha') ||
+          v.name.includes('Karen') ||
+          v.name.includes('Daniel') ||
+          v.name.includes('Moira') ||
+          v.name.includes('Tessa') ||
+          v.name.includes('Kate')
+        )
+      ) || voices.find(v => v.lang === 'en-US')
+       || voices.find(v => v.lang.startsWith('en'));
+
+      if (voice) {
+        utterance.voice = voice;
+        utterance.rate = 0.7;
       }
 
-      const ttsUrl = `https://tsn.baidu.com/text2audio?lan=en&tok=${token}&ctp=1&cuid=123456&tex=${encodeURIComponent(text)}&vol=9&rate=4&per=0`;
+      speechSynthesis.speak(utterance);
+    };
 
-      // Use fetch + blob to handle CORS
-      const response = await fetch(ttsUrl);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      await audio.play();
-
-      // Clean up blob URL after playing
-      audio.onended = () => URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('TTS error:', err);
+    // Voices might not be loaded yet
+    if (speechSynthesis.getVoices().length > 0 && !voicesLoaded.current) {
+      voicesLoaded.current = true;
+      loadAndSpeak();
+    } else if (voicesLoaded.current) {
+      loadAndSpeak();
+    } else {
+      speechSynthesis.onvoiceschanged = () => {
+        voicesLoaded.current = true;
+        loadAndSpeak();
+      };
+      // Trigger voice loading
+      speechSynthesis.getVoices();
     }
   };
 
